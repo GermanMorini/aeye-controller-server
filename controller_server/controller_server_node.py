@@ -2,11 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import json
-import sys
 import threading
 import time
 from dataclasses import asdict
-from pathlib import Path
 from typing import Any, Dict, Optional
 
 import rclpy
@@ -21,13 +19,8 @@ from .control_logic import (
     select_effective_command,
 )
 
-
 def _load_comms_client_class():
-    vendor_src = Path(__file__).resolve().parent.parent / "controller" / "src"
-    vendor_src_str = str(vendor_src)
-    if vendor_src.exists() and vendor_src_str not in sys.path:
-        sys.path.insert(0, vendor_src_str)
-    from rpy_esp32_comms.transport import CommsClient  # type: ignore
+    from controller_server.vendor.rpy_esp32_comms.transport import CommsClient
 
     return CommsClient
 

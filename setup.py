@@ -13,7 +13,7 @@ setup(
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', glob('launch/*.launch.py')),
     ],
-    install_requires=['setuptools', 'websockets>=11.0'],
+    install_requires=['setuptools', 'websockets>=11.0', 'pyserial>=3.5'],
     zip_safe=True,
     maintainer='ros',
     maintainer_email='ros@todo.todo',
