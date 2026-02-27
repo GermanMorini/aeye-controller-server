@@ -20,7 +20,7 @@ from .control_logic import (
 )
 
 def _load_comms_client_class():
-    from controller_server.vendor.rpy_esp32_comms.transport import CommsClient
+    from controller_server.rpy_esp32_comms.transport import CommsClient
 
     return CommsClient
 
@@ -40,6 +40,7 @@ class ControllerServerNode(Node):
         self.declare_parameter("auto_timeout_s", 0.7)
         self.declare_parameter("max_abs_angular_z", 0.8)
         self.declare_parameter("reverse_brake_pct", 20)
+        self.declare_parameter("invert_steer_from_cmd_vel", False)
         self.declare_parameter("auto_drive_enabled", True)
         self.declare_parameter("estop_brake_pct", 100)
         self.declare_parameter("ws_enabled", True)
@@ -60,6 +61,7 @@ class ControllerServerNode(Node):
         self._auto_timeout_s = float(self.get_parameter("auto_timeout_s").value)
         self._max_abs_angular_z = float(self.get_parameter("max_abs_angular_z").value)
         self._reverse_brake_pct = int(self.get_parameter("reverse_brake_pct").value)
+        self._invert_steer_from_cmd_vel = bool(self.get_parameter("invert_steer_from_cmd_vel").value)
         self._auto_drive_enabled = bool(self.get_parameter("auto_drive_enabled").value)
         self._estop_brake_pct = int(self.get_parameter("estop_brake_pct").value)
         self._ws_enabled = bool(self.get_parameter("ws_enabled").value)
@@ -107,12 +109,19 @@ class ControllerServerNode(Node):
             angular_z=msg.angular.z,
             max_speed_mps=self._max_speed_mps,
             max_abs_angular_z=self._max_abs_angular_z,
+            invert_steer=self._invert_steer_from_cmd_vel,
             auto_drive_enabled=self._auto_drive_enabled,
             reverse_brake_pct=self._reverse_brake_pct,
         )
         with self._state_lock:
             self._auto_cmd = cmd
             self._auto_stamp_s = time.monotonic()
+        self.get_logger().info(
+            "cmd_vel_safe rx "
+            f"linear_x={msg.linear.x:.3f} angular_z={msg.angular.z:.3f} -> "
+            f"drive={int(cmd.drive_enabled)} estop={int(cmd.estop)} "
+            f"speed_mps={cmd.speed_mps:.3f} steer_pct={cmd.steer_pct} brake_pct={cmd.brake_pct}"
+        )
 
     def _apply_to_controller(self, cmd: DesiredCommand) -> None:
         self._client.set_drive_enabled(bool(cmd.drive_enabled))
@@ -206,8 +215,11 @@ class ControllerServerNode(Node):
 
     async def _ws_handler(self, websocket) -> None:
         await websocket.send(json.dumps({"ok": True, "message": "controller_server ready"}, ensure_ascii=True))
+        peer = str(getattr(websocket, "remote_address", "unknown"))
         async for raw in websocket:
+            self.get_logger().info(f"ws rx peer={peer} payload={raw}")
             response = self._handle_ws_raw(raw)
+            self.get_logger().info(f"ws tx peer={peer} response={json.dumps(response, ensure_ascii=True)}")
             await websocket.send(json.dumps(response, ensure_ascii=True))
 
     def _parse_optional_bool(self, value: Any, field_name: str) -> bool:
@@ -260,6 +272,11 @@ class ControllerServerNode(Node):
                     "global_estop": self._global_estop,
                     "manual_command": asdict(self._manual_cmd),
                 }
+            self.get_logger().info(
+                "ws command applied "
+                f"mode={snapshot['mode']} global_estop={int(snapshot['global_estop'])} "
+                f"manual={snapshot['manual_command']}"
+            )
             return {"ok": True, "state": snapshot}
 
         except (TypeError, ValueError) as exc:

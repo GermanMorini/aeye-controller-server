@@ -1,4 +1,4 @@
-from rpy_esp32_comms.controller import CommandState
+from controller_server.rpy_esp32_comms.controller import CommandState
 
 
 def test_state_clamps() -> None:

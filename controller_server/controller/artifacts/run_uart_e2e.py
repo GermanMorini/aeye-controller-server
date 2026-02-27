@@ -9,7 +9,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from rpy_esp32_comms.transport import CommsClient
+from controller_server.rpy_esp32_comms.transport import CommsClient
 
 
 class TelnetCapture:

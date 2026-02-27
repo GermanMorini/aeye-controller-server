@@ -2,14 +2,14 @@ import struct
 
 import pytest
 
-from rpy_esp32_comms.controller import CommandState
-from rpy_esp32_comms.protocol import (
+from controller_server.rpy_esp32_comms.controller import CommandState
+from controller_server.rpy_esp32_comms.protocol import (
     EspFrameParser,
     crc8_maxim,
     decode_esp_frame,
     encode_pi_frame,
 )
-from rpy_esp32_comms.telemetry import ControlSource
+from controller_server.rpy_esp32_comms.telemetry import ControlSource
 
 
 def make_esp_frame(status: int, speed_raw: int, steer_raw: int, brake: int) -> bytes:

@@ -32,6 +32,7 @@ def command_from_cmd_vel(
     angular_z: float,
     max_speed_mps: float,
     max_abs_angular_z: float,
+    invert_steer: bool,
     auto_drive_enabled: bool,
     reverse_brake_pct: int,
 ) -> DesiredCommand:
@@ -42,6 +43,8 @@ def command_from_cmd_vel(
     angular_scale = max(0.01, abs(float(max_abs_angular_z)))
     steer_ratio = clamp(float(angular_z) / angular_scale, -1.0, 1.0)
     steer = int(round(steer_ratio * 100.0))
+    if bool(invert_steer):
+        steer = -steer
 
     brake = 0
     if float(linear_x) < 0.0:

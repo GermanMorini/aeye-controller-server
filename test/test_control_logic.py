@@ -11,6 +11,7 @@ def test_command_from_cmd_vel_clamps_and_scales() -> None:
         angular_z=2.0,
         max_speed_mps=4.0,
         max_abs_angular_z=0.8,
+        invert_steer=False,
         auto_drive_enabled=True,
         reverse_brake_pct=30,
     )
@@ -26,11 +27,25 @@ def test_command_from_cmd_vel_negative_speed_brakes() -> None:
         angular_z=0.0,
         max_speed_mps=4.0,
         max_abs_angular_z=0.8,
+        invert_steer=False,
         auto_drive_enabled=True,
         reverse_brake_pct=25,
     )
     assert cmd.speed_mps == 0.0
     assert cmd.brake_pct == 25
+
+
+def test_command_from_cmd_vel_invert_steer() -> None:
+    cmd = command_from_cmd_vel(
+        linear_x=1.0,
+        angular_z=0.4,
+        max_speed_mps=4.0,
+        max_abs_angular_z=0.8,
+        invert_steer=True,
+        auto_drive_enabled=True,
+        reverse_brake_pct=25,
+    )
+    assert cmd.steer_pct == -50
 
 
 def test_select_effective_command_manual_timeout() -> None:

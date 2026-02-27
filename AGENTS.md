@@ -13,23 +13,23 @@
 - Workspace local host: `/home/gmorini/Documentos/codigo/ros2/workspace`.
 
 ## Estado real del repositorio (importante)
-- `setup.py` y `package.xml` aun tienen metadata placeholder (`TODO`) y **no exponen `console_scripts`** ROS2.
+- `setup.py` y `package.xml` aun tienen metadata placeholder (`TODO`), pero ya exponen el ejecutable ROS2 `controller_server_node`.
 - El codigo de control activo vive en:
-  - `controller_server/controller/src/rpy_esp32_comms/*.py`
+  - `controller_server/rpy_esp32_comms/*.py`
 - Tests funcionales del protocolo UART v2 viven en:
   - `controller_server/controller/tests/`
 - En este checkout, `controller_server/controller/` aparece como contenido no trackeado en git (`git status --short`). Tratarlo como parte critica del trabajo actual antes de limpiar/mover archivos.
 
 ## Mapa rapido de codigo
-- `controller_server/controller/src/rpy_esp32_comms/controller.py`
+- `controller_server/rpy_esp32_comms/controller.py`
   - `CommandState` con clamps de seguridad (`speed`, `steer`, `brake`) y `safe_reset()`.
-- `controller_server/controller/src/rpy_esp32_comms/protocol.py`
+- `controller_server/rpy_esp32_comms/protocol.py`
   - framing UART v2, `crc8_maxim`, encode/decode, parser incremental robusto (`EspFrameParser`).
-- `controller_server/controller/src/rpy_esp32_comms/transport.py`
+- `controller_server/rpy_esp32_comms/transport.py`
   - `CommsClient` con hilos TX/RX, locks, estadisticas, apertura de `/dev/serial0`.
-- `controller_server/controller/src/rpy_esp32_comms/telemetry.py`
+- `controller_server/rpy_esp32_comms/telemetry.py`
   - estructura `Telemetry`, decode de `status_flags`, `ControlSource`.
-- `controller_server/controller/src/rpy_esp32_comms/cli.py`
+- `controller_server/rpy_esp32_comms/cli.py`
   - REPL manual (`drive`, `estop`, `speed`, `steer`, `brake`, `status`, `watch`, `log`, `quit`).
 - `controller_server/controller/COMUNICACIONES_UART_V2.md`
   - contrato del protocolo y semantica de seguridad.
@@ -68,14 +68,14 @@ Desde `/home/gmorini/Documentos/codigo/ros2/workspace`:
 
 ### Ejecutar la CLI UART v2
 Dentro del contenedor (o en host con entorno equivalente):
-1. `cd /ros2_ws/src/controller_server/controller_server/controller`
-2. `python3 -m pip install -r requirements.txt`
-3. `PYTHONPATH=src python3 -m rpy_esp32_comms --port /dev/serial0 --baud 115200 --tx-hz 50`
+1. `cd /ros2_ws/src/controller_server`
+2. `python3 -m pip install -r controller_server/controller/requirements.txt`
+3. `python3 -m controller_server.rpy_esp32_comms --port /dev/serial0 --baud 115200 --tx-hz 50`
 
 ## Testing
 - Unit tests del modulo UART:
   - `cd controller_server/controller`
-  - `PYTHONPATH=src python3 -m pytest -q`
+  - `PYTHONPATH=../.. python3 -m pytest -q`
 - En este entorno host actual faltan dependencias de test (`pytest` no instalado por defecto). Ejecutar en contenedor o venv antes de validar.
 
 ## Reglas para cambios de agentes

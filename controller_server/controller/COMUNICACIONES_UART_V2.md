@@ -99,7 +99,7 @@ Comando de arranque:
 ```bash
 cd /home/salus/codigo/RAPY_ESP32_COMMS
 source .venv/bin/activate
-PYTHONPATH=src python -m rpy_esp32_comms
+python -m controller_server.rpy_esp32_comms
 ```
 
 Comandos disponibles dentro del prompt `rpy>`:
@@ -118,7 +118,7 @@ Comandos disponibles dentro del prompt `rpy>`:
 ## 6. Flags de arranque de la app
 
 ```bash
-PYTHONPATH=src python -m rpy_esp32_comms \
+python -m controller_server.rpy_esp32_comms \
   --port /dev/serial0 \
   --baud 115200 \
   --tx-hz 50 \
@@ -175,8 +175,8 @@ rpy> watch on
 
 ## 9. Referencias de codigo
 
-- Protocolo: `src/rpy_esp32_comms/protocol.py`
-- Transporte serial e hilos TX/RX: `src/rpy_esp32_comms/transport.py`
-- CLI: `src/rpy_esp32_comms/cli.py`
-- Modelo de telemetria: `src/rpy_esp32_comms/telemetry.py`
-- Estado de comando: `src/rpy_esp32_comms/controller.py`
+- Protocolo: `controller_server/rpy_esp32_comms/protocol.py`
+- Transporte serial e hilos TX/RX: `controller_server/rpy_esp32_comms/transport.py`
+- CLI: `controller_server/rpy_esp32_comms/cli.py`
+- Modelo de telemetria: `controller_server/rpy_esp32_comms/telemetry.py`
+- Estado de comando: `controller_server/rpy_esp32_comms/controller.py`

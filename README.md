@@ -5,13 +5,12 @@ Este repositorio corre en el workspace Docker del proyecto sobre Raspberry Pi 5.
 
 ## Estado actual
 
-Hoy conviven dos capas:
+El paquete ya incluye un nodo ROS2 funcional:
 
-1. Esqueleto ROS 2 del paquete `controller_server` (raiz del repo).
-2. Implementacion funcional de comunicaciones UART v2 en:
-   - `controller_server/controller/src/rpy_esp32_comms`
-
-Importante: actualmente no hay `console_scripts` ROS2 publicados en `setup.py`, por lo que el flujo operativo principal es via la CLI Python del modulo UART.
+1. `controller_server_node` (nodo ROS2 principal).
+2. Libreria UART v2 integrada en:
+   - `controller_server/rpy_esp32_comms`
+3. Carpeta `controller_server/controller/` conservada para pruebas, artefactos y documentación histórica.
 
 ## Arquitectura funcional (UART v2)
 
@@ -28,49 +27,99 @@ Documentacion tecnica del protocolo:
 
 ## Estructura relevante
 
-- `setup.py`, `package.xml`: metadata del paquete ROS2 (pendiente de completar).
-- `controller_server/controller/src/rpy_esp32_comms/controller.py`: estado de comando y limites.
-- `controller_server/controller/src/rpy_esp32_comms/protocol.py`: encode/decode de frames + CRC + parser.
-- `controller_server/controller/src/rpy_esp32_comms/transport.py`: `CommsClient` con hilos TX/RX.
-- `controller_server/controller/src/rpy_esp32_comms/cli.py`: interfaz REPL para pruebas/manual.
-- `controller_server/controller/tests/`: tests unitarios del protocolo y estado.
+- `controller_server/controller_server_node.py`: nodo ROS2, WebSocket y arbitraje.
+- `controller_server/control_logic.py`: mapeo `/cmd_vel_safe` -> comando y selección `manual/auto`.
+- `controller_server/rpy_esp32_comms/*.py`: transporte UART, protocolo, telemetria.
+- `launch/controller_server.launch.py`: launch por defecto.
+- `test/test_control_logic.py`: tests de mapeo y arbitraje.
+- `controller_server/controller/tests/`: tests del protocolo UART original.
 
-## Uso rapido (dentro de Docker ROS2)
+## Interfaces del nodo
+
+### Suscripciones
+
+- `/cmd_vel_safe` (`geometry_msgs/msg/Twist`)
+
+### Publicaciones
+
+- `/controller/status` (`std_msgs/msg/String`, JSON)
+- `/controller/telemetry` (`std_msgs/msg/String`, JSON)
+
+### WebSocket
+
+- Endpoint por defecto: `ws://0.0.0.0:8765`
+- Payload JSON soportado:
+  - `mode`: `"manual"` o `"auto"`
+  - `estop`: `true/false` (global)
+  - `drive`: `true/false`
+  - `speed_mps`: `float`
+  - `steer_pct`: `int [-100,100]`
+  - `brake_pct`: `int [0,100]`
+  - `cmd_estop`: `true/false` (solo comando manual)
+
+## Parámetros principales
+
+- `serial_port` (`/dev/serial0`)
+- `serial_baud` (`115200`)
+- `serial_tx_hz` (`50.0`)
+- `mode` (`auto` o `manual`)
+- `manual_timeout_s` / `auto_timeout_s`
+- `max_speed_mps`
+- `max_abs_angular_z`
+- `invert_steer_from_cmd_vel` (invierte signo de `angular.z` al mapear a dirección)
+- `reverse_brake_pct`
+- `ws_enabled`, `ws_host`, `ws_port`
+
+## Ejecutar en Docker ROS2
 
 Desde la raiz del workspace (`/home/gmorini/Documentos/codigo/ros2/workspace`):
 
 ```bash
 docker compose up -d --build
 ./tools/compile-ros.sh controller_server
-./tools/exec.sh
+./tools/exec.sh "source /ros2_ws/install/setup.bash && ros2 launch controller_server controller_server.launch.py"
 ```
 
-Ya dentro del contenedor:
+Ejecutar directo:
 
 ```bash
-cd /ros2_ws/src/controller_server/controller_server/controller
-python3 -m pip install -r requirements.txt
-PYTHONPATH=src python3 -m rpy_esp32_comms --port /dev/serial0 --baud 115200 --tx-hz 50
+./tools/exec.sh "source /ros2_ws/install/setup.bash && ros2 run controller_server controller_server_node"
 ```
 
-## Comandos de la CLI
+## Probar con teleop_twist_keyboard
 
-- `help`
-- `status`
-- `drive on|off`
-- `estop on|off`
-- `speed <mps>`
-- `steer <int -100..100>`
-- `brake <0..100>`
-- `watch on|off`
-- `log on|off`
-- `quit`
+Publicar hacia `/cmd_vel_safe`:
+
+```bash
+./tools/exec.sh "source /ros2_ws/install/setup.bash && ros2 run teleop_twist_keyboard teleop_twist_keyboard --ros-args -r cmd_vel:=/cmd_vel_safe"
+```
+
+Ver comando efectivo aplicado:
+
+```bash
+./tools/exec.sh "source /ros2_ws/install/setup.bash && ros2 topic echo /controller/status"
+```
+
+## Logs de comandos entrantes
+
+El nodo loggea explícitamente:
+- cada mensaje recibido por `/cmd_vel_safe` y su mapeo a comando interno,
+- cada payload recibido por WebSocket y la respuesta/estado aplicado.
 
 ## Testing
 
+Tests de lógica del nodo:
+
+```bash
+cd /home/gmorini/Documentos/codigo/ros2/workspace/src/controller_server
+python3 -m pytest -q test/test_control_logic.py
+```
+
+Tests del módulo UART:
+
 ```bash
 cd controller_server/controller
-PYTHONPATH=src python3 -m pytest -q
+PYTHONPATH=../.. python3 -m pytest -q
 ```
 
 Si falla por dependencias, instala primero:
@@ -78,15 +127,6 @@ Si falla por dependencias, instala primero:
 ```bash
 python3 -m pip install -r requirements.txt
 ```
-
-## Integracion pendiente como nodo ROS2
-
-Para cerrar este paquete como `controller_server` de produccion ROS2, faltan (o deben validarse) al menos:
-
-1. Exponer `console_scripts` ROS2 en `setup.py`.
-2. Definir nodo(s) ROS2 de entrada/salida (topics y tipos de mensaje).
-3. Completar metadata de `package.xml` (`description`, `license`, maintainers reales).
-4. Conectar explícitamente el pipeline de comandos seguros del stack de navegacion.
 
 ## Referencias
 

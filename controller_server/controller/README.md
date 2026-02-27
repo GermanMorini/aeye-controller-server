@@ -19,13 +19,13 @@ python3 -m pip install -r requirements.txt
 
 ```bash
 cd /home/salus/codigo/RAPY_ESP32_COMMS
-PYTHONPATH=src python3 -m rpy_esp32_comms
+python3 -m controller_server.rpy_esp32_comms
 ```
 
 Con flags:
 
 ```bash
-PYTHONPATH=src python3 -m rpy_esp32_comms \
+python3 -m controller_server.rpy_esp32_comms \
   --port /dev/serial0 \
   --baud 115200 \
   --tx-hz 50 \
@@ -87,6 +87,6 @@ Sentinels:
 ## Tests
 
 ```bash
-cd /home/salus/codigo/RAPY_ESP32_COMMS
-python3 -m pytest -q
+cd /home/salus/codigo/ros2/workspace/src/controller_server/controller_server/controller
+PYTHONPATH=../.. python3 -m pytest -q
 ```
