@@ -38,7 +38,7 @@ class ControllerServerNode(Node):
         self.declare_parameter("mode", "auto")
         self.declare_parameter("manual_timeout_s", 0.7)
         self.declare_parameter("auto_timeout_s", 0.7)
-        self.declare_parameter("max_abs_angular_z", 0.8)
+        self.declare_parameter("max_abs_angular_z", 0.4)
         self.declare_parameter("reverse_brake_pct", 20)
         self.declare_parameter("invert_steer_from_cmd_vel", False)
         self.declare_parameter("auto_drive_enabled", True)

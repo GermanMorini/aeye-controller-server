@@ -65,7 +65,7 @@ Documentacion tecnica del protocolo:
 - `mode` (`auto` o `manual`)
 - `manual_timeout_s` / `auto_timeout_s`
 - `max_speed_mps`
-- `max_abs_angular_z`
+- `max_abs_angular_z` (default `0.4`, alineado con `wz_max`/`wz_min` de navegación)
 - `invert_steer_from_cmd_vel` (invierte signo de `angular.z` al mapear a dirección)
 - `reverse_brake_pct`
 - `ws_enabled`, `ws_host`, `ws_port`

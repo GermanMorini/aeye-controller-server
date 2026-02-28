@@ -16,6 +16,7 @@ def generate_launch_description() -> LaunchDescription:
                         "serial_baud": 115200,
                         "serial_tx_hz": 50.0,
                         "mode": "auto",
+                        "max_abs_angular_z": 0.4,
                         "invert_steer_from_cmd_vel": True,
                         "ws_enabled": True,
                         "ws_host": "0.0.0.0",
