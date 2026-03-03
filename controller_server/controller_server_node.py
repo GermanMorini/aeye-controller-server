@@ -39,6 +39,8 @@ class ControllerServerNode(Node):
         self.declare_parameter("manual_timeout_s", 0.7)
         self.declare_parameter("auto_timeout_s", 0.7)
         self.declare_parameter("max_abs_angular_z", 0.4)
+        self.declare_parameter("vx_deadband_mps", 0.10)
+        self.declare_parameter("vx_min_effective_mps", 0.75)
         self.declare_parameter("reverse_brake_pct", 20)
         self.declare_parameter("invert_steer_from_cmd_vel", False)
         self.declare_parameter("auto_drive_enabled", True)
@@ -60,6 +62,24 @@ class ControllerServerNode(Node):
         self._manual_timeout_s = float(self.get_parameter("manual_timeout_s").value)
         self._auto_timeout_s = float(self.get_parameter("auto_timeout_s").value)
         self._max_abs_angular_z = float(self.get_parameter("max_abs_angular_z").value)
+        self._vx_deadband_mps = float(self.get_parameter("vx_deadband_mps").value)
+        if self._vx_deadband_mps < 0.0:
+            self.get_logger().warn(
+                f"Invalid vx_deadband_mps={self._vx_deadband_mps:.3f}; clamping to 0.0"
+            )
+            self._vx_deadband_mps = 0.0
+        self._vx_min_effective_mps = float(self.get_parameter("vx_min_effective_mps").value)
+        if self._vx_min_effective_mps < 0.0:
+            self.get_logger().warn(
+                f"Invalid vx_min_effective_mps={self._vx_min_effective_mps:.3f}; clamping to 0.0"
+            )
+            self._vx_min_effective_mps = 0.0
+        if self._vx_min_effective_mps > self._max_speed_mps:
+            self.get_logger().warn(
+                "vx_min_effective_mps greater than max_speed_mps; "
+                f"using max_speed_mps={self._max_speed_mps:.3f} as effective minimum"
+            )
+            self._vx_min_effective_mps = self._max_speed_mps
         self._reverse_brake_pct = int(self.get_parameter("reverse_brake_pct").value)
         self._invert_steer_from_cmd_vel = bool(self.get_parameter("invert_steer_from_cmd_vel").value)
         self._auto_drive_enabled = bool(self.get_parameter("auto_drive_enabled").value)
@@ -108,6 +128,8 @@ class ControllerServerNode(Node):
             linear_x=msg.linear.x,
             angular_z=msg.angular.z,
             max_speed_mps=self._max_speed_mps,
+            vx_deadband_mps=self._vx_deadband_mps,
+            vx_min_effective_mps=self._vx_min_effective_mps,
             max_abs_angular_z=self._max_abs_angular_z,
             invert_steer=self._invert_steer_from_cmd_vel,
             auto_drive_enabled=self._auto_drive_enabled,

@@ -31,13 +31,28 @@ def command_from_cmd_vel(
     linear_x: float,
     angular_z: float,
     max_speed_mps: float,
+    vx_deadband_mps: float,
+    vx_min_effective_mps: float,
     max_abs_angular_z: float,
     invert_steer: bool,
     auto_drive_enabled: bool,
     reverse_brake_pct: int,
 ) -> DesiredCommand:
     max_speed = max(0.0, float(max_speed_mps))
-    speed = clamp(float(linear_x), 0.0, max_speed)
+    deadband = max(0.0, float(vx_deadband_mps))
+    min_effective = clamp(float(vx_min_effective_mps), 0.0, max_speed)
+
+    linear = float(linear_x)
+    speed = 0.0
+    estop = False
+    if linear >= 0.0:
+        speed = clamp(linear, 0.0, max_speed)
+        if speed < deadband:
+            speed = 0.0
+        elif speed < min_effective:
+            speed = min_effective
+    if linear == 0.0:
+        estop = True
 
     steer = 0
     angular_scale = max(0.01, abs(float(max_abs_angular_z)))
@@ -47,13 +62,13 @@ def command_from_cmd_vel(
         steer = -steer
 
     brake = 0
-    if float(linear_x) < 0.0:
+    if linear <= 0.0:
         brake = int(clamp(float(reverse_brake_pct), 0.0, 100.0))
         speed = 0.0
 
     return DesiredCommand(
         drive_enabled=bool(auto_drive_enabled),
-        estop=False,
+        estop=estop,
         speed_mps=speed,
         steer_pct=steer,
         brake_pct=brake,
