@@ -17,7 +17,6 @@ from .control_logic import (
     command_from_cmd_vel,
     safe_command,
     select_effective_command,
-    update_auto_zero_speed_estop_latch,
 )
 
 def _load_comms_client_class():
@@ -94,7 +93,6 @@ class ControllerServerNode(Node):
         self._manual_stamp_s = 0.0
         self._auto_cmd = safe_command()
         self._auto_stamp_s = 0.0
-        self._auto_zero_speed_estop_latched = False
         self._global_estop = False
         self._last_source = "init"
 
@@ -138,10 +136,6 @@ class ControllerServerNode(Node):
             reverse_brake_pct=self._reverse_brake_pct,
         )
         with self._state_lock:
-            self._auto_zero_speed_estop_latched = update_auto_zero_speed_estop_latch(
-                current_latched=self._auto_zero_speed_estop_latched,
-                linear_x=msg.linear.x,
-            )
             self._auto_cmd = cmd
             self._auto_stamp_s = time.monotonic()
         self.get_logger().info(
@@ -166,7 +160,6 @@ class ControllerServerNode(Node):
             manual_stamp_s = self._manual_stamp_s
             auto_cmd = self._auto_cmd
             auto_stamp_s = self._auto_stamp_s
-            auto_zero_speed_estop_latched = self._auto_zero_speed_estop_latched
             global_estop = self._global_estop
 
         result = select_effective_command(
@@ -181,7 +174,7 @@ class ControllerServerNode(Node):
         )
         cmd = result.command
 
-        if global_estop or cmd.estop or (mode == "auto" and auto_zero_speed_estop_latched):
+        if global_estop or cmd.estop:
             cmd = DesiredCommand(
                 drive_enabled=False,
                 estop=True,
@@ -201,7 +194,6 @@ class ControllerServerNode(Node):
             "source": source,
             "fresh": result.fresh,
             "global_estop": global_estop,
-            "auto_zero_speed_estop_latched": auto_zero_speed_estop_latched,
             "command": asdict(cmd),
             "timestamp": time.time(),
         }

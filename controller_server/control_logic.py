@@ -27,15 +27,6 @@ def safe_command() -> DesiredCommand:
     return DesiredCommand(drive_enabled=False, estop=False, speed_mps=0.0, steer_pct=0, brake_pct=0)
 
 
-def update_auto_zero_speed_estop_latch(current_latched: bool, linear_x: float) -> bool:
-    linear = float(linear_x)
-    if linear == 0.0:
-        return True
-    if linear > 0.0:
-        return False
-    return bool(current_latched)
-
-
 def command_from_cmd_vel(
     linear_x: float,
     angular_z: float,

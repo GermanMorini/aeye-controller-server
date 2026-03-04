@@ -2,7 +2,6 @@ from controller_server.control_logic import (
     DesiredCommand,
     command_from_cmd_vel,
     select_effective_command,
-    update_auto_zero_speed_estop_latch,
 )
 
 
@@ -168,23 +167,3 @@ def test_select_effective_command_auto_fresh() -> None:
     )
     assert result.source == "auto"
     assert result.command.speed_mps == 2.0
-
-
-def test_update_auto_zero_speed_estop_latch_zero_sets_true() -> None:
-    assert update_auto_zero_speed_estop_latch(current_latched=False, linear_x=0.0) is True
-
-
-def test_update_auto_zero_speed_estop_latch_zero_keeps_true() -> None:
-    assert update_auto_zero_speed_estop_latch(current_latched=True, linear_x=0.0) is True
-
-
-def test_update_auto_zero_speed_estop_latch_positive_releases() -> None:
-    assert update_auto_zero_speed_estop_latch(current_latched=True, linear_x=0.5) is False
-
-
-def test_update_auto_zero_speed_estop_latch_negative_keeps_true() -> None:
-    assert update_auto_zero_speed_estop_latch(current_latched=True, linear_x=-0.3) is True
-
-
-def test_update_auto_zero_speed_estop_latch_negative_keeps_false() -> None:
-    assert update_auto_zero_speed_estop_latch(current_latched=False, linear_x=-0.3) is False
