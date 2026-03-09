@@ -25,9 +25,11 @@ Campos:
   - nibble alto: version (`2`).
   - bit0: `ESTOP`.
   - bit1: `DRIVE_EN`.
+  - bit2: `REV_REQ`.
 - `steer_i8`: direccion en `-100..100`.
-- `speed_cmd_u16_le`: velocidad objetivo en `m/s x100` (little-endian).
+- `speed_cmd_u16_le`: magnitud de velocidad objetivo en `m/s x100` (little-endian).
   - Ejemplo: `1.60 m/s -> 160`.
+  - Comando efectivo: `signed_speed = (REV_REQ ? -1 : +1) * speed_cmd_u16`.
 - `brake_u8`: freno `0..100`.
 - `crc8`: CRC-8 Dallas/Maxim del frame sin el ultimo byte.
 
@@ -108,7 +110,7 @@ Comandos disponibles dentro del prompt `rpy>`:
 - `status`: estado deseado + ultima telemetria + estadisticas.
 - `drive on|off`: habilita/deshabilita mando de traccion desde Pi.
 - `estop on|off`: activa/desactiva parada de emergencia.
-- `speed <mps>`: setpoint absoluto de velocidad (ej: `speed 1.2`).
+- `speed <mps>`: setpoint firmado de velocidad (ej: `speed 1.2` o `speed -0.8`).
 - `steer <int -100..100>`: direccion en porcentaje.
 - `brake <0..100>`: freno deseado.
 - `watch on|off`: imprime telemetria periodica.
@@ -123,6 +125,7 @@ python -m controller_server.rpy_esp32_comms \
   --baud 115200 \
   --tx-hz 50 \
   --telemetry-print-hz 10 \
+  --max-reverse-mps 1.30 \
   --log-file /home/salus/codigo/RAPY_ESP32_COMMS/session.jsonl
 ```
 
@@ -132,6 +135,7 @@ Descripcion:
 - `--baud`: baudios UART.
 - `--tx-hz`: frecuencia de envio Pi->ESP32.
 - `--telemetry-print-hz`: frecuencia de impresion al usar `watch on`.
+- `--max-reverse-mps`: magnitud maxima permitida para comando de reversa (`speed<0`).
 - `--log-file`: guarda eventos/telemetria en JSONL.
 
 ## 7. Ejemplo de secuencia de manejo

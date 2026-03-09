@@ -15,6 +15,7 @@ PROTOCOL_VERSION = 2
 
 CMD_FLAG_ESTOP = 1 << 0
 CMD_FLAG_DRIVE_EN = 1 << 1
+CMD_FLAG_REV_REQ = 1 << 2
 
 SPEED_SENTINEL = 0xFFFF
 STEER_SENTINEL = -32768
@@ -39,9 +40,13 @@ def encode_pi_frame(state: CommandState) -> bytes:
     if state.drive_enabled:
         flags |= CMD_FLAG_DRIVE_EN
 
+    signed_speed_mps = float(state.speed_mps)
+    if signed_speed_mps < 0.0:
+        flags |= CMD_FLAG_REV_REQ
+
     ver_flags = ((PROTOCOL_VERSION & 0x0F) << 4) | (flags & 0x0F)
     steer_i8 = max(-100, min(100, int(state.steer_pct)))
-    speed_centi_mps = max(0, min(65535, int(round(float(state.speed_mps) * 100.0))))
+    speed_centi_mps = max(0, min(65535, int(round(abs(signed_speed_mps) * 100.0))))
     brake_u8 = max(0, min(100, int(state.brake_pct)))
 
     frame = bytearray(PI_FRAME_SIZE)

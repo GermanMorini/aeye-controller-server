@@ -30,6 +30,7 @@ python3 -m controller_server.rpy_esp32_comms \
   --baud 115200 \
   --tx-hz 50 \
   --telemetry-print-hz 10 \
+  --max-reverse-mps 1.30 \
   --log-file /home/salus/codigo/RAPY_ESP32_COMMS/session.jsonl
 ```
 
@@ -39,7 +40,7 @@ python3 -m controller_server.rpy_esp32_comms \
 - `status`
 - `drive on|off`
 - `estop on|off`
-- `speed <mps>`
+- `speed <mps signed>`
 - `steer <int -100..100>`
 - `brake <0..100>`
 - `watch on|off`
@@ -58,7 +59,7 @@ python3 -m controller_server.rpy_esp32_comms \
 - `decode_esp_frame(frame) -> Telemetry`
 - `CommsClient.start()`
 - `CommsClient.stop()`
-- `CommsClient.set_speed_mps(v)`
+- `CommsClient.set_speed_mps(v)` (acepta positivos y negativos)
 - `CommsClient.set_steer_pct(v)`
 - `CommsClient.set_brake_pct(v)`
 - `CommsClient.set_drive_enabled(v)`
@@ -74,6 +75,7 @@ python3 -m controller_server.rpy_esp32_comms \
 - `ver_flags`:
   - bit0: `ESTOP`
   - bit1: `DRIVE_EN`
+  - bit2: `REV_REQ`
 
 ### ESP32 -> Pi (8 bytes)
 

@@ -93,3 +93,29 @@ def test_parser_does_not_drop_on_payload_0x55() -> None:
     assert out == [frame]
     assert parser.dropped_partial_frames == 0
     assert parser.crc_error_frames == 0
+
+
+def test_encode_pi_frame_negative_speed_sets_rev_req() -> None:
+    state = CommandState(drive_enabled=True, estop=False, steer_pct=10, speed_mps=-1.23, brake_pct=5)
+    frame = encode_pi_frame(state)
+
+    assert len(frame) == 7
+    assert frame[0] == 0xAA
+    assert frame[1] == 0x26  # version=2, DRIVE_EN=1, REV_REQ=1
+    assert frame[2] == 10
+    assert frame[3] == 0x7B
+    assert frame[4] == 0x00
+    assert frame[5] == 5
+    assert frame[6] == crc8_maxim(frame[:-1])
+
+
+def test_encode_pi_frame_zero_speed_clears_rev_req() -> None:
+    state = CommandState(drive_enabled=True, estop=False, steer_pct=0, speed_mps=0.0, brake_pct=0)
+    frame = encode_pi_frame(state)
+
+    assert len(frame) == 7
+    assert frame[0] == 0xAA
+    assert frame[1] == 0x22  # version=2, DRIVE_EN=1
+    assert frame[3] == 0x00
+    assert frame[4] == 0x00
+    assert frame[6] == crc8_maxim(frame[:-1])

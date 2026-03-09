@@ -15,7 +15,7 @@ HELP_TEXT = """Comandos:
   status
   drive on|off
   estop on|off
-  speed <mps>
+  speed <mps signed>
   steer <int -100..100>
   brake <0..100>
   watch on|off
@@ -87,7 +87,12 @@ def _watch_loop(client: CommsClient, stop_event: threading.Event, enabled_ref: d
 
 
 def run_cli(args: argparse.Namespace) -> int:
-    client = CommsClient(port=args.port, baud=args.baud, tx_hz=args.tx_hz)
+    client = CommsClient(
+        port=args.port,
+        baud=args.baud,
+        tx_hz=args.tx_hz,
+        max_reverse_mps=args.max_reverse_mps,
+    )
     logger = SessionLogger(args.log_file)
 
     watch_state = {"watch": False}
@@ -148,7 +153,7 @@ def run_cli(args: argparse.Namespace) -> int:
 
                 elif cmd == "speed":
                     if len(parts) != 2:
-                        raise ValueError("uso: speed <mps>")
+                        raise ValueError("uso: speed <mps signed>")
                     value = float(parts[1])
                     applied = client.set_speed_mps(value)
                     print(f"speed={applied:.2f} m/s")
@@ -229,6 +234,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         type=float,
         default=10.0,
         help="Frecuencia de impresión de telemetría cuando watch=on (default: 10)",
+    )
+    parser.add_argument(
+        "--max-reverse-mps",
+        type=float,
+        default=1.30,
+        help="Magnitud máxima permitida en reversa para speed<0 (default: 1.30)",
     )
     parser.add_argument("--log-file", default=None, help="Ruta opcional para log JSONL de sesión")
     return parser

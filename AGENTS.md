@@ -43,6 +43,7 @@
 - Flags de comando actuales:
   - bit0: `ESTOP`
   - bit1: `DRIVE_EN`
+  - bit2: `REV_REQ`
 
 Si cambias frame layout, version, CRC o flags, debes actualizar **en el mismo cambio**:
 1. `protocol.py`
@@ -57,7 +58,7 @@ Si cambias frame layout, version, CRC o flags, debes actualizar **en el mismo ca
 - Mantener clamps:
   - `steer_pct` en `[-100, 100]`
   - `brake_pct` en `[0, 100]`
-  - `speed_mps` en `[0, max_speed_mps]`
+  - `speed_mps` en `[-max_reverse_mps, max_speed_mps]`
 
 ## Flujo de trabajo recomendado
 ### Dentro del workspace Docker ROS2

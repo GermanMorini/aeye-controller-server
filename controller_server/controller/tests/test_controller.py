@@ -2,9 +2,10 @@ from controller_server.rpy_esp32_comms.controller import CommandState
 
 
 def test_state_clamps() -> None:
-    state = CommandState(max_speed_mps=4.0)
+    state = CommandState(max_speed_mps=4.0, max_reverse_mps=1.3)
 
-    assert state.set_speed_mps(-1.0) == 0.0
+    assert state.set_speed_mps(-0.5) == -0.5
+    assert state.set_speed_mps(-9.0) == -1.3
     assert state.set_speed_mps(10.0) == 4.0
     assert state.set_steer_pct(-999) == -100
     assert state.set_steer_pct(999) == 100

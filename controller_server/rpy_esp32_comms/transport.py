@@ -7,7 +7,7 @@ from typing import Optional
 
 import serial
 
-from .controller import CommandState, DEFAULT_MAX_SPEED_MPS
+from .controller import CommandState, DEFAULT_MAX_SPEED_MPS, DEFAULT_MAX_REVERSE_MPS
 from .protocol import EspFrameParser, decode_esp_frame, encode_pi_frame
 from .telemetry import Telemetry
 
@@ -28,6 +28,7 @@ class CommsClient:
         baud: int = 115200,
         tx_hz: float = 50.0,
         max_speed_mps: float = DEFAULT_MAX_SPEED_MPS,
+        max_reverse_mps: float = DEFAULT_MAX_REVERSE_MPS,
     ) -> None:
         if tx_hz <= 0:
             raise ValueError("tx_hz must be > 0")
@@ -37,7 +38,10 @@ class CommsClient:
         self.tx_hz = float(tx_hz)
         self.tx_period_s = 1.0 / self.tx_hz
 
-        self._state = CommandState(max_speed_mps=float(max_speed_mps))
+        self._state = CommandState(
+            max_speed_mps=float(max_speed_mps),
+            max_reverse_mps=float(max_reverse_mps),
+        )
         self._state_lock = threading.Lock()
 
         self._latest_telemetry: Optional[Telemetry] = None

@@ -52,7 +52,7 @@ Documentacion tecnica del protocolo:
   - `mode`: `"manual"` o `"auto"`
   - `estop`: `true/false` (global)
   - `drive`: `true/false`
-  - `speed_mps`: `float`
+  - `speed_mps`: `float` firmado (manual WS: `[-max_reverse_mps, max_speed_mps]`)
   - `steer_pct`: `int [-100,100]`
   - `brake_pct`: `int [0,100]`
   - `cmd_estop`: `true/false` (solo comando manual)
@@ -65,6 +65,7 @@ Documentacion tecnica del protocolo:
 - `mode` (`auto` o `manual`)
 - `manual_timeout_s` / `auto_timeout_s`
 - `max_speed_mps`
+- `max_reverse_mps` (default `1.30`, solo comandos manuales WS/CLI)
 - `max_abs_angular_z` (default `0.4`, alineado con `wz_max`/`wz_min` de navegación)
 - `invert_steer_from_cmd_vel` (invierte signo de `angular.z` al mapear a dirección)
 - `reverse_brake_pct`

@@ -15,6 +15,7 @@ def generate_launch_description() -> LaunchDescription:
                         "serial_port": "/dev/serial0",
                         "serial_baud": 115200,
                         "serial_tx_hz": 50.0,
+                        "max_reverse_mps": 1.30,
                         "mode": "auto",
                         "max_abs_angular_z": 0.4,
                         "vx_deadband_mps": 0.10,

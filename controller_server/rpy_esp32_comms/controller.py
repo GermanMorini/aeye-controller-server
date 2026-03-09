@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 
 DEFAULT_MAX_SPEED_MPS = 12.0
+DEFAULT_MAX_REVERSE_MPS = 1.30
 
 
 def _clamp(value: float, low: float, high: float) -> float:
@@ -18,9 +19,10 @@ class CommandState:
     speed_mps: float = 0.0
     brake_pct: int = 0
     max_speed_mps: float = DEFAULT_MAX_SPEED_MPS
+    max_reverse_mps: float = DEFAULT_MAX_REVERSE_MPS
 
     def set_speed_mps(self, value: float) -> float:
-        clamped = _clamp(float(value), 0.0, self.max_speed_mps)
+        clamped = _clamp(float(value), -self.max_reverse_mps, self.max_speed_mps)
         self.speed_mps = clamped
         return clamped
 
@@ -55,4 +57,5 @@ class CommandState:
             "speed_mps": self.speed_mps,
             "brake_pct": self.brake_pct,
             "max_speed_mps": self.max_speed_mps,
+            "max_reverse_mps": self.max_reverse_mps,
         }

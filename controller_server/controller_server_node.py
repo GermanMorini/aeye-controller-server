@@ -33,6 +33,7 @@ class ControllerServerNode(Node):
         self.declare_parameter("serial_baud", 115200)
         self.declare_parameter("serial_tx_hz", 50.0)
         self.declare_parameter("max_speed_mps", 4.0)
+        self.declare_parameter("max_reverse_mps", 1.30)
         self.declare_parameter("control_hz", 30.0)
         self.declare_parameter("telemetry_pub_hz", 10.0)
         self.declare_parameter("mode", "auto")
@@ -53,6 +54,12 @@ class ControllerServerNode(Node):
         self._serial_baud = int(self.get_parameter("serial_baud").value)
         self._serial_tx_hz = float(self.get_parameter("serial_tx_hz").value)
         self._max_speed_mps = float(self.get_parameter("max_speed_mps").value)
+        self._max_reverse_mps = float(self.get_parameter("max_reverse_mps").value)
+        if self._max_reverse_mps < 0.0:
+            self.get_logger().warn(
+                f"Invalid max_reverse_mps={self._max_reverse_mps:.3f}; clamping to 0.0"
+            )
+            self._max_reverse_mps = 0.0
         self._control_hz = max(1.0, float(self.get_parameter("control_hz").value))
         self._telemetry_pub_hz = max(1.0, float(self.get_parameter("telemetry_pub_hz").value))
         self._mode = str(self.get_parameter("mode").value).strip().lower()
@@ -102,6 +109,7 @@ class ControllerServerNode(Node):
             baud=self._serial_baud,
             tx_hz=self._serial_tx_hz,
             max_speed_mps=self._max_speed_mps,
+            max_reverse_mps=self._max_reverse_mps,
         )
         self._client.start()
 
@@ -281,7 +289,7 @@ class ControllerServerNode(Node):
                 if "cmd_estop" in data:
                     cmd.estop = self._parse_optional_bool(data["cmd_estop"], "cmd_estop")
 
-                cmd.speed_mps = max(0.0, min(self._max_speed_mps, float(cmd.speed_mps)))
+                cmd.speed_mps = max(-self._max_reverse_mps, min(self._max_speed_mps, float(cmd.speed_mps)))
                 cmd.steer_pct = int(max(-100, min(100, int(cmd.steer_pct))))
                 cmd.brake_pct = int(max(0, min(100, int(cmd.brake_pct))))
 
