@@ -27,8 +27,8 @@ Documentacion tecnica del protocolo:
 
 ## Estructura relevante
 
-- `controller_server/controller_server_node.py`: nodo ROS2, WebSocket y arbitraje.
-- `controller_server/control_logic.py`: mapeo `/cmd_vel_safe` -> comando y selección `manual/auto`.
+- `controller_server/controller_server_node.py`: nodo ROS2 y aplicación de comandos a actuadores.
+- `controller_server/control_logic.py`: mapeo `/cmd_vel_safe` -> comando y watchdog de timeout.
 - `controller_server/rpy_esp32_comms/*.py`: transporte UART, protocolo, telemetria.
 - `launch/controller_server.launch.py`: launch por defecto.
 - `test/test_control_logic.py`: tests de mapeo y arbitraje.
@@ -45,31 +45,17 @@ Documentacion tecnica del protocolo:
 - `/controller/status` (`std_msgs/msg/String`, JSON)
 - `/controller/telemetry` (`std_msgs/msg/String`, JSON)
 
-### WebSocket
-
-- Endpoint por defecto: `ws://0.0.0.0:8765`
-- Payload JSON soportado:
-  - `mode`: `"manual"` o `"auto"`
-  - `estop`: `true/false` (global)
-  - `drive`: `true/false`
-  - `speed_mps`: `float` firmado (manual WS: `[-max_reverse_mps, max_speed_mps]`)
-  - `steer_pct`: `int [-100,100]`
-  - `brake_pct`: `int [0,100]`
-  - `cmd_estop`: `true/false` (solo comando manual)
-
 ## Parámetros principales
 
 - `serial_port` (`/dev/serial0`)
 - `serial_baud` (`115200`)
 - `serial_tx_hz` (`50.0`)
-- `mode` (`auto` o `manual`)
-- `manual_timeout_s` / `auto_timeout_s`
+- `auto_timeout_s`
 - `max_speed_mps`
-- `max_reverse_mps` (default `1.30`, solo comandos manuales WS/CLI)
+- `max_reverse_mps` (default `1.30`)
 - `max_abs_angular_z` (default `0.4`, alineado con `wz_max`/`wz_min` de navegación)
 - `invert_steer_from_cmd_vel` (invierte signo de `angular.z` al mapear a dirección)
 - `reverse_brake_pct`
-- `ws_enabled`, `ws_host`, `ws_port`
 
 ## Ejecutar en Docker ROS2
 
@@ -104,8 +90,7 @@ Ver comando efectivo aplicado:
 ## Logs de comandos entrantes
 
 El nodo loggea explícitamente:
-- cada mensaje recibido por `/cmd_vel_safe` y su mapeo a comando interno,
-- cada payload recibido por WebSocket y la respuesta/estado aplicado.
+- cada mensaje recibido por `/cmd_vel_safe` y su mapeo a comando interno.
 
 ## Testing
 

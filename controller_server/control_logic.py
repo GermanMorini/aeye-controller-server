@@ -83,22 +83,12 @@ def command_from_cmd_vel(
 
 
 def select_effective_command(
-    mode: str,
     now_s: float,
-    manual_cmd: DesiredCommand,
-    manual_stamp_s: float,
-    manual_timeout_s: float,
     auto_cmd: DesiredCommand,
     auto_stamp_s: float,
     auto_timeout_s: float,
 ) -> ArbitrationResult:
-    manual_fresh = (now_s - manual_stamp_s) <= max(0.0, manual_timeout_s)
     auto_fresh = (now_s - auto_stamp_s) <= max(0.0, auto_timeout_s)
-
-    if mode == "manual":
-        if manual_fresh:
-            return ArbitrationResult(command=manual_cmd, source="manual", fresh=True)
-        return ArbitrationResult(command=safe_command(), source="manual_timeout", fresh=False)
 
     if auto_fresh:
         return ArbitrationResult(command=auto_cmd, source="auto", fresh=True)

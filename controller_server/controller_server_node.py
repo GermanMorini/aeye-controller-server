@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import asyncio
 import json
 import threading
 import time
 from dataclasses import asdict
-from typing import Any, Dict, Optional
 
 import rclpy
 from geometry_msgs.msg import Twist
@@ -18,6 +16,7 @@ from .control_logic import (
     safe_command,
     select_effective_command,
 )
+
 
 def _load_comms_client_class():
     from controller_server.rpy_esp32_comms.transport import CommsClient
@@ -36,8 +35,6 @@ class ControllerServerNode(Node):
         self.declare_parameter("max_reverse_mps", 1.30)
         self.declare_parameter("control_hz", 30.0)
         self.declare_parameter("telemetry_pub_hz", 10.0)
-        self.declare_parameter("mode", "auto")
-        self.declare_parameter("manual_timeout_s", 0.7)
         self.declare_parameter("auto_timeout_s", 0.7)
         self.declare_parameter("max_abs_angular_z", 0.4)
         self.declare_parameter("vx_deadband_mps", 0.10)
@@ -46,9 +43,6 @@ class ControllerServerNode(Node):
         self.declare_parameter("invert_steer_from_cmd_vel", False)
         self.declare_parameter("auto_drive_enabled", True)
         self.declare_parameter("estop_brake_pct", 100)
-        self.declare_parameter("ws_enabled", True)
-        self.declare_parameter("ws_host", "0.0.0.0")
-        self.declare_parameter("ws_port", 8765)
 
         self._serial_port = self.get_parameter("serial_port").value
         self._serial_baud = int(self.get_parameter("serial_baud").value)
@@ -62,11 +56,6 @@ class ControllerServerNode(Node):
             self._max_reverse_mps = 0.0
         self._control_hz = max(1.0, float(self.get_parameter("control_hz").value))
         self._telemetry_pub_hz = max(1.0, float(self.get_parameter("telemetry_pub_hz").value))
-        self._mode = str(self.get_parameter("mode").value).strip().lower()
-        if self._mode not in ("manual", "auto"):
-            self.get_logger().warn(f"Invalid mode '{self._mode}', forcing auto")
-            self._mode = "auto"
-        self._manual_timeout_s = float(self.get_parameter("manual_timeout_s").value)
         self._auto_timeout_s = float(self.get_parameter("auto_timeout_s").value)
         self._max_abs_angular_z = float(self.get_parameter("max_abs_angular_z").value)
         self._vx_deadband_mps = float(self.get_parameter("vx_deadband_mps").value)
@@ -91,16 +80,10 @@ class ControllerServerNode(Node):
         self._invert_steer_from_cmd_vel = bool(self.get_parameter("invert_steer_from_cmd_vel").value)
         self._auto_drive_enabled = bool(self.get_parameter("auto_drive_enabled").value)
         self._estop_brake_pct = int(self.get_parameter("estop_brake_pct").value)
-        self._ws_enabled = bool(self.get_parameter("ws_enabled").value)
-        self._ws_host = str(self.get_parameter("ws_host").value)
-        self._ws_port = int(self.get_parameter("ws_port").value)
 
         self._state_lock = threading.Lock()
-        self._manual_cmd = safe_command()
-        self._manual_stamp_s = 0.0
         self._auto_cmd = safe_command()
         self._auto_stamp_s = 0.0
-        self._global_estop = False
         self._last_source = "init"
 
         CommsClient = _load_comms_client_class()
@@ -120,15 +103,9 @@ class ControllerServerNode(Node):
         self.create_timer(1.0 / self._control_hz, self._control_tick)
         self.create_timer(1.0 / self._telemetry_pub_hz, self._telemetry_tick)
 
-        self._ws_loop: Optional[asyncio.AbstractEventLoop] = None
-        self._ws_thread: Optional[threading.Thread] = None
-        self._ws_server = None
-        if self._ws_enabled:
-            self._start_ws_server()
-
         self.get_logger().info(
             "controller_server ready "
-            f"(mode={self._mode}, serial={self._serial_port}@{self._serial_baud}, ws={self._ws_enabled})"
+            f"(serial={self._serial_port}@{self._serial_baud}, source=/cmd_vel_safe)"
         )
 
     def _on_cmd_vel_safe(self, msg: Twist) -> None:
@@ -164,26 +141,18 @@ class ControllerServerNode(Node):
     def _control_tick(self) -> None:
         now = time.monotonic()
         with self._state_lock:
-            mode = self._mode
-            manual_cmd = self._manual_cmd
-            manual_stamp_s = self._manual_stamp_s
             auto_cmd = self._auto_cmd
             auto_stamp_s = self._auto_stamp_s
-            global_estop = self._global_estop
 
         result = select_effective_command(
-            mode=mode,
             now_s=now,
-            manual_cmd=manual_cmd,
-            manual_stamp_s=manual_stamp_s,
-            manual_timeout_s=self._manual_timeout_s,
             auto_cmd=auto_cmd,
             auto_stamp_s=auto_stamp_s,
             auto_timeout_s=self._auto_timeout_s,
         )
         cmd = result.command
 
-        if global_estop or cmd.estop:
+        if cmd.estop:
             cmd = DesiredCommand(
                 drive_enabled=False,
                 estop=True,
@@ -199,10 +168,10 @@ class ControllerServerNode(Node):
         self._last_source = source
 
         status = {
-            "mode": mode,
+            "mode": "auto",
             "source": source,
             "fresh": result.fresh,
-            "global_estop": global_estop,
+            "global_estop": False,
             "command": asdict(cmd),
             "timestamp": time.time(),
         }
@@ -223,112 +192,7 @@ class ControllerServerNode(Node):
         msg.data = json.dumps(payload, ensure_ascii=True)
         self._telemetry_pub.publish(msg)
 
-    def _start_ws_server(self) -> None:
-        self._ws_loop = asyncio.new_event_loop()
-        self._ws_thread = threading.Thread(target=self._ws_thread_main, daemon=True, name="controller-ws")
-        self._ws_thread.start()
-
-    def _ws_thread_main(self) -> None:
-        assert self._ws_loop is not None
-        asyncio.set_event_loop(self._ws_loop)
-        self._ws_loop.run_until_complete(self._ws_start())
-        self._ws_loop.run_forever()
-
-    async def _ws_start(self) -> None:
-        try:
-            import websockets
-        except ImportError as exc:
-            self.get_logger().error(f"websockets not installed: {exc}")
-            return
-
-        self._ws_server = await websockets.serve(self._ws_handler, self._ws_host, self._ws_port)
-        self.get_logger().info(f"WebSocket server listening on ws://{self._ws_host}:{self._ws_port}")
-
-    async def _ws_handler(self, websocket) -> None:
-        await websocket.send(json.dumps({"ok": True, "message": "controller_server ready"}, ensure_ascii=True))
-        peer = str(getattr(websocket, "remote_address", "unknown"))
-        async for raw in websocket:
-            self.get_logger().info(f"ws rx peer={peer} payload={raw}")
-            response = self._handle_ws_raw(raw)
-            self.get_logger().info(f"ws tx peer={peer} response={json.dumps(response, ensure_ascii=True)}")
-            await websocket.send(json.dumps(response, ensure_ascii=True))
-
-    def _parse_optional_bool(self, value: Any, field_name: str) -> bool:
-        if isinstance(value, bool):
-            return value
-        raise ValueError(f"'{field_name}' must be boolean")
-
-    def _handle_ws_raw(self, raw: str) -> Dict[str, Any]:
-        try:
-            data = json.loads(raw)
-        except json.JSONDecodeError as exc:
-            return {"ok": False, "error": f"invalid_json: {exc}"}
-
-        if not isinstance(data, dict):
-            return {"ok": False, "error": "payload must be object"}
-
-        try:
-            with self._state_lock:
-                if "mode" in data:
-                    mode = str(data["mode"]).strip().lower()
-                    if mode not in ("manual", "auto"):
-                        raise ValueError("mode must be 'manual' or 'auto'")
-                    self._mode = mode
-
-                if "estop" in data:
-                    self._global_estop = self._parse_optional_bool(data["estop"], "estop")
-
-                cmd = DesiredCommand(**asdict(self._manual_cmd))
-                if "drive" in data:
-                    cmd.drive_enabled = self._parse_optional_bool(data["drive"], "drive")
-                if "speed_mps" in data:
-                    cmd.speed_mps = float(data["speed_mps"])
-                if "steer_pct" in data:
-                    cmd.steer_pct = int(data["steer_pct"])
-                if "brake_pct" in data:
-                    cmd.brake_pct = int(data["brake_pct"])
-                if "cmd_estop" in data:
-                    cmd.estop = self._parse_optional_bool(data["cmd_estop"], "cmd_estop")
-
-                cmd.speed_mps = max(-self._max_reverse_mps, min(self._max_speed_mps, float(cmd.speed_mps)))
-                cmd.steer_pct = int(max(-100, min(100, int(cmd.steer_pct))))
-                cmd.brake_pct = int(max(0, min(100, int(cmd.brake_pct))))
-
-                if any(k in data for k in ("drive", "speed_mps", "steer_pct", "brake_pct", "cmd_estop")):
-                    self._manual_cmd = cmd
-                    self._manual_stamp_s = time.monotonic()
-
-                snapshot = {
-                    "mode": self._mode,
-                    "global_estop": self._global_estop,
-                    "manual_command": asdict(self._manual_cmd),
-                }
-            self.get_logger().info(
-                "ws command applied "
-                f"mode={snapshot['mode']} global_estop={int(snapshot['global_estop'])} "
-                f"manual={snapshot['manual_command']}"
-            )
-            return {"ok": True, "state": snapshot}
-
-        except (TypeError, ValueError) as exc:
-            return {"ok": False, "error": str(exc)}
-
     def destroy_node(self) -> bool:
-        if self._ws_loop is not None:
-            if self._ws_server is not None:
-                async def _close_ws():
-                    self._ws_server.close()
-                    await self._ws_server.wait_closed()
-
-                fut = asyncio.run_coroutine_threadsafe(_close_ws(), self._ws_loop)
-                try:
-                    fut.result(timeout=1.0)
-                except Exception:
-                    pass
-            self._ws_loop.call_soon_threadsafe(self._ws_loop.stop)
-        if self._ws_thread is not None:
-            self._ws_thread.join(timeout=1.0)
-
         self._client.stop()
         return super().destroy_node()
 

@@ -157,35 +157,25 @@ def test_command_from_cmd_vel_min_effective_is_clamped_by_max_speed() -> None:
     assert cmd.speed_mps == 0.60
 
 
-def test_select_effective_command_manual_timeout() -> None:
+def test_select_effective_command_auto_timeout() -> None:
     now_s = 20.0
-    manual_cmd = DesiredCommand(drive_enabled=True, speed_mps=1.0)
     auto_cmd = DesiredCommand(drive_enabled=True, speed_mps=2.0)
     result = select_effective_command(
-        mode="manual",
         now_s=now_s,
-        manual_cmd=manual_cmd,
-        manual_stamp_s=10.0,
-        manual_timeout_s=0.5,
         auto_cmd=auto_cmd,
-        auto_stamp_s=19.8,
+        auto_stamp_s=18.0,
         auto_timeout_s=0.5,
     )
-    assert result.source == "manual_timeout"
+    assert result.source == "auto_timeout"
     assert result.command.drive_enabled is False
     assert result.command.speed_mps == 0.0
 
 
 def test_select_effective_command_auto_fresh() -> None:
     now_s = 20.0
-    manual_cmd = DesiredCommand(drive_enabled=True, speed_mps=1.0)
     auto_cmd = DesiredCommand(drive_enabled=True, speed_mps=2.0)
     result = select_effective_command(
-        mode="auto",
         now_s=now_s,
-        manual_cmd=manual_cmd,
-        manual_stamp_s=19.5,
-        manual_timeout_s=0.5,
         auto_cmd=auto_cmd,
         auto_stamp_s=19.9,
         auto_timeout_s=0.5,
