@@ -136,6 +136,7 @@ class ControllerServerNode(Node):
             linear_x=msg.linear.x,
             angular_z=msg.angular.z,
             max_speed_mps=self._max_speed_mps,
+            max_reverse_mps=self._max_reverse_mps,
             vx_deadband_mps=self._vx_deadband_mps,
             vx_min_effective_mps=self._vx_min_effective_mps,
             max_abs_angular_z=self._max_abs_angular_z,
