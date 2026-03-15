@@ -24,12 +24,19 @@ class ArbitrationResult:
 
 
 def safe_command() -> DesiredCommand:
-    return DesiredCommand(drive_enabled=False, estop=False, speed_mps=0.0, steer_pct=0, brake_pct=0)
+    return DesiredCommand(
+        drive_enabled=False,
+        estop=False,
+        speed_mps=0.0,
+        steer_pct=0,
+        brake_pct=0,
+    )
 
 
 def command_from_cmd_vel(
     linear_x: float,
     angular_z: float,
+    brake_pct: int,
     max_speed_mps: float,
     max_reverse_mps: float,
     vx_deadband_mps: float,
@@ -46,7 +53,6 @@ def command_from_cmd_vel(
 
     linear = float(linear_x)
     speed = 0.0
-    estop = False
     if linear > 0.0:
         speed = clamp(linear, 0.0, max_speed)
         if speed < deadband:
@@ -59,8 +65,6 @@ def command_from_cmd_vel(
             speed = 0.0
         else:
             speed = -reverse_speed
-    if linear == 0.0:
-        estop = True
 
     steer = 0
     angular_scale = max(0.01, abs(float(max_abs_angular_z)))
@@ -69,9 +73,11 @@ def command_from_cmd_vel(
     if bool(invert_steer):
         steer = -steer
 
-    brake = 0
-    if linear == 0.0:
-        brake = int(clamp(float(reverse_brake_pct), 0.0, 100.0))
+    brake = int(clamp(float(brake_pct), 0.0, 100.0))
+    estop = brake > 0
+    if estop:
+        speed = 0.0
+        steer = 0
 
     return DesiredCommand(
         drive_enabled=bool(auto_drive_enabled),

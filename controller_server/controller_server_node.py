@@ -6,7 +6,7 @@ import time
 from dataclasses import asdict
 
 import rclpy
-from geometry_msgs.msg import Twist
+from interfaces.msg import CmdVelFinal
 from rclpy.node import Node
 from std_msgs.msg import String
 
@@ -77,7 +77,9 @@ class ControllerServerNode(Node):
             )
             self._vx_min_effective_mps = self._max_speed_mps
         self._reverse_brake_pct = int(self.get_parameter("reverse_brake_pct").value)
-        self._invert_steer_from_cmd_vel = bool(self.get_parameter("invert_steer_from_cmd_vel").value)
+        self._invert_steer_from_cmd_vel = bool(
+            self.get_parameter("invert_steer_from_cmd_vel").value
+        )
         self._auto_drive_enabled = bool(self.get_parameter("auto_drive_enabled").value)
         self._estop_brake_pct = int(self.get_parameter("estop_brake_pct").value)
 
@@ -96,7 +98,7 @@ class ControllerServerNode(Node):
         )
         self._client.start()
 
-        self.create_subscription(Twist, "/cmd_vel_safe", self._on_cmd_vel_safe, 10)
+        self.create_subscription(CmdVelFinal, "/cmd_vel_final", self._on_cmd_vel_final, 10)
         self._status_pub = self.create_publisher(String, "/controller/status", 10)
         self._telemetry_pub = self.create_publisher(String, "/controller/telemetry", 10)
 
@@ -105,13 +107,14 @@ class ControllerServerNode(Node):
 
         self.get_logger().info(
             "controller_server ready "
-            f"(serial={self._serial_port}@{self._serial_baud}, source=/cmd_vel_safe)"
+            f"(serial={self._serial_port}@{self._serial_baud}, source=/cmd_vel_final)"
         )
 
-    def _on_cmd_vel_safe(self, msg: Twist) -> None:
+    def _on_cmd_vel_final(self, msg: CmdVelFinal) -> None:
         cmd = command_from_cmd_vel(
-            linear_x=msg.linear.x,
-            angular_z=msg.angular.z,
+            linear_x=msg.twist.linear.x,
+            angular_z=msg.twist.angular.z,
+            brake_pct=msg.brake_pct,
             max_speed_mps=self._max_speed_mps,
             max_reverse_mps=self._max_reverse_mps,
             vx_deadband_mps=self._vx_deadband_mps,
@@ -125,8 +128,9 @@ class ControllerServerNode(Node):
             self._auto_cmd = cmd
             self._auto_stamp_s = time.monotonic()
         self.get_logger().info(
-            "cmd_vel_safe rx "
-            f"linear_x={msg.linear.x:.3f} angular_z={msg.angular.z:.3f} -> "
+            "cmd_vel_final rx "
+            f"linear_x={msg.twist.linear.x:.3f} angular_z={msg.twist.angular.z:.3f} "
+            f"brake_pct={int(msg.brake_pct)} -> "
             f"drive={int(cmd.drive_enabled)} estop={int(cmd.estop)} "
             f"speed_mps={cmd.speed_mps:.3f} steer_pct={cmd.steer_pct} brake_pct={cmd.brake_pct}"
         )
