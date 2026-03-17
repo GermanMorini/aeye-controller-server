@@ -32,7 +32,13 @@ class SessionLogger:
             self._path.parent.mkdir(parents=True, exist_ok=True)
             self._file = self._path.open("a", encoding="utf-8")
 
-    def write(self, event: str, command: str, telemetry: Optional[dict], extra: Optional[dict] = None) -> None:
+    def write(
+        self,
+        event: str,
+        command: str,
+        telemetry: Optional[dict],
+        extra: Optional[dict] = None,
+    ) -> None:
         if self._file is None:
             return
         payload = {
@@ -79,7 +85,12 @@ def _format_telemetry(telemetry) -> str:
     )
 
 
-def _watch_loop(client: CommsClient, stop_event: threading.Event, enabled_ref: dict, period_s: float) -> None:
+def _watch_loop(
+    client: CommsClient,
+    stop_event: threading.Event,
+    enabled_ref: dict,
+    period_s: float,
+) -> None:
     while not stop_event.is_set():
         if enabled_ref.get("watch", False):
             print(_format_telemetry(client.get_latest_telemetry()))
@@ -226,9 +237,23 @@ def run_cli(args: argparse.Namespace) -> int:
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Cliente UART v2 Raspberry <-> ESP32")
-    parser.add_argument("--port", default="/dev/serial0", help="Puerto serial (default: /dev/serial0)")
-    parser.add_argument("--baud", type=int, default=115200, help="Baudrate UART (default: 115200)")
-    parser.add_argument("--tx-hz", type=float, default=50.0, help="Frecuencia de TX Pi->ESP32 (default: 50)")
+    parser.add_argument(
+        "--port",
+        default="/dev/serial0",
+        help="Puerto serial (default: /dev/serial0)",
+    )
+    parser.add_argument(
+        "--baud",
+        type=int,
+        default=115200,
+        help="Baudrate UART (default: 115200)",
+    )
+    parser.add_argument(
+        "--tx-hz",
+        type=float,
+        default=50.0,
+        help="Frecuencia de TX Pi->ESP32 (default: 50)",
+    )
     parser.add_argument(
         "--telemetry-print-hz",
         type=float,
@@ -241,5 +266,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=1.30,
         help="Magnitud máxima permitida en reversa para speed<0 (default: 1.30)",
     )
-    parser.add_argument("--log-file", default=None, help="Ruta opcional para log JSONL de sesión")
+    parser.add_argument(
+        "--log-file",
+        default=None,
+        help="Ruta opcional para log JSONL de sesión",
+    )
     return parser

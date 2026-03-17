@@ -25,7 +25,13 @@ def make_esp_frame(status: int, speed_raw: int, steer_raw: int, brake: int) -> b
 
 
 def test_encode_pi_frame_fields_and_crc() -> None:
-    state = CommandState(drive_enabled=True, estop=False, steer_pct=-25, speed_mps=1.23, brake_pct=55)
+    state = CommandState(
+        drive_enabled=True,
+        estop=False,
+        steer_pct=-25,
+        speed_mps=1.23,
+        brake_pct=55,
+    )
     frame = encode_pi_frame(state)
 
     assert len(frame) == 7
@@ -96,7 +102,13 @@ def test_parser_does_not_drop_on_payload_0x55() -> None:
 
 
 def test_encode_pi_frame_negative_speed_sets_rev_req() -> None:
-    state = CommandState(drive_enabled=True, estop=False, steer_pct=10, speed_mps=-1.23, brake_pct=5)
+    state = CommandState(
+        drive_enabled=True,
+        estop=False,
+        steer_pct=10,
+        speed_mps=-1.23,
+        brake_pct=5,
+    )
     frame = encode_pi_frame(state)
 
     assert len(frame) == 7
@@ -110,7 +122,13 @@ def test_encode_pi_frame_negative_speed_sets_rev_req() -> None:
 
 
 def test_encode_pi_frame_zero_speed_clears_rev_req() -> None:
-    state = CommandState(drive_enabled=True, estop=False, steer_pct=0, speed_mps=0.0, brake_pct=0)
+    state = CommandState(
+        drive_enabled=True,
+        estop=False,
+        steer_pct=0,
+        speed_mps=0.0,
+        brake_pct=0,
+    )
     frame = encode_pi_frame(state)
 
     assert len(frame) == 7

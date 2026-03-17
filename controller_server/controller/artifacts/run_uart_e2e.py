@@ -27,7 +27,11 @@ class TelnetCapture:
     def connect(self) -> None:
         self.sock = socket.create_connection((self.host, self.port), timeout=self.timeout_s)
         self.sock.settimeout(0.2)
-        self._thread = threading.Thread(target=self._reader_loop, daemon=True, name="esp32-telnet-reader")
+        self._thread = threading.Thread(
+            target=self._reader_loop,
+            daemon=True,
+            name="esp32-telnet-reader",
+        )
         self._thread.start()
         time.sleep(0.5)
 
@@ -99,7 +103,11 @@ def snapshot(client: CommsClient) -> Dict[str, Any]:
     }
 
 
-def capture_status(capture: TelnetCapture, extra_cmds: Optional[List[str]] = None, wait_s: float = 0.35) -> List[str]:
+def capture_status(
+    capture: TelnetCapture,
+    extra_cmds: Optional[List[str]] = None,
+    wait_s: float = 0.35,
+) -> List[str]:
     idx = capture.line_count()
     capture.send("comms.status")
     if extra_cmds:
@@ -166,7 +174,11 @@ def main() -> int:
 
         for name, hold_s, action in scenario:
             action()
-            immediate_logs = capture_status(capture, extra_cmds=["spid.status"], wait_s=0.45)
+            immediate_logs = capture_status(
+                capture,
+                extra_cmds=["spid.status"],
+                wait_s=0.45,
+            )
             time.sleep(hold_s)
             held_logs = capture_status(capture, wait_s=0.35)
 
@@ -181,7 +193,13 @@ def main() -> int:
 
         # Collect last logs and cleanup.
         cleanup_idx = capture.line_count()
-        for cmd in ["speed.stream off", "spid.stream off", "drive.log pid off", "drive.log off", "comms.status"]:
+        for cmd in [
+            "speed.stream off",
+            "spid.stream off",
+            "drive.log pid off",
+            "drive.log off",
+            "comms.status",
+        ]:
             capture.send(cmd)
             time.sleep(0.15)
 
@@ -198,8 +216,14 @@ def main() -> int:
         }
 
         all_telnet_lines = capture.lines_since(0)
-        telnet_log_path.write_text("\n".join(all_telnet_lines) + "\n", encoding="utf-8")
-        result_path.write_text(json.dumps(result, indent=2, ensure_ascii=True), encoding="utf-8")
+        telnet_log_path.write_text(
+            "\n".join(all_telnet_lines) + "\n",
+            encoding="utf-8",
+        )
+        result_path.write_text(
+            json.dumps(result, indent=2, ensure_ascii=True),
+            encoding="utf-8",
+        )
 
         print(f"OK: wrote {result_path}")
         print(f"OK: wrote {telnet_log_path}")
