@@ -190,6 +190,24 @@ def test_command_from_cmd_vel_between_deadband_and_min_maps_to_min() -> None:
     assert cmd.speed_mps == 0.75
 
 
+def test_command_from_cmd_vel_preserves_curvature_when_min_is_applied() -> None:
+    cmd = command_from_cmd_vel(
+        linear_x=0.20,
+        angular_z=0.10,
+        brake_pct=0,
+        max_speed_mps=4.0,
+        max_reverse_mps=1.3,
+        vx_deadband_mps=0.01,
+        vx_min_effective_mps=0.50,
+        max_abs_angular_z=0.4,
+        invert_steer=False,
+        auto_drive_enabled=True,
+        reverse_brake_pct=25,
+    )
+    assert cmd.speed_mps == 0.50
+    assert cmd.steer_pct == 62
+
+
 def test_command_from_cmd_vel_above_min_keeps_value() -> None:
     cmd = command_from_cmd_vel(
         linear_x=1.20,

@@ -6,7 +6,7 @@ import time
 from dataclasses import asdict
 
 import rclpy
-from interfaces.msg import CmdVelFinal
+from interfaces.msg import CmdVelFinal, DriveTelemetry
 from rclpy.node import Node
 from std_msgs.msg import String
 
@@ -43,6 +43,7 @@ class ControllerServerNode(Node):
         self.declare_parameter("invert_steer_from_cmd_vel", False)
         self.declare_parameter("auto_drive_enabled", True)
         self.declare_parameter("estop_brake_pct", 100)
+        self.declare_parameter("telemetry_stale_timeout_s", 0.5)
 
         self._serial_port = self.get_parameter("serial_port").value
         self._serial_baud = int(self.get_parameter("serial_baud").value)
@@ -82,6 +83,9 @@ class ControllerServerNode(Node):
         )
         self._auto_drive_enabled = bool(self.get_parameter("auto_drive_enabled").value)
         self._estop_brake_pct = int(self.get_parameter("estop_brake_pct").value)
+        self._telemetry_stale_timeout_s = max(
+            0.05, float(self.get_parameter("telemetry_stale_timeout_s").value)
+        )
 
         self._state_lock = threading.Lock()
         self._auto_cmd = safe_command()
@@ -101,6 +105,9 @@ class ControllerServerNode(Node):
         self.create_subscription(CmdVelFinal, "/cmd_vel_final", self._on_cmd_vel_final, 10)
         self._status_pub = self.create_publisher(String, "/controller/status", 10)
         self._telemetry_pub = self.create_publisher(String, "/controller/telemetry", 10)
+        self._drive_telemetry_pub = self.create_publisher(
+            DriveTelemetry, "/controller/drive_telemetry", 10
+        )
 
         self.create_timer(1.0 / self._control_hz, self._control_tick)
         self.create_timer(1.0 / self._telemetry_pub_hz, self._telemetry_tick)
@@ -186,6 +193,7 @@ class ControllerServerNode(Node):
     def _telemetry_tick(self) -> None:
         telemetry = self._client.get_latest_telemetry()
         stats = self._client.get_stats()
+        command_state = self._client.get_command_state()
         payload = {
             "source": self._last_source,
             "telemetry": telemetry.as_dict() if telemetry is not None else None,
@@ -195,6 +203,38 @@ class ControllerServerNode(Node):
         msg = String()
         msg.data = json.dumps(payload, ensure_ascii=True)
         self._telemetry_pub.publish(msg)
+
+        drive_msg = DriveTelemetry()
+        drive_msg.stamp = self.get_clock().now().to_msg()
+        telemetry_age_s = None
+        if telemetry is not None:
+            telemetry_age_s = max(0.0, time.monotonic() - float(telemetry.rx_monotonic_s))
+        drive_msg.ready = bool(telemetry.ready) if telemetry is not None else False
+        drive_msg.fresh = (
+            telemetry is not None
+            and telemetry_age_s is not None
+            and telemetry_age_s <= self._telemetry_stale_timeout_s
+        )
+        drive_msg.drive_enabled = bool(command_state.get("drive_enabled", False))
+        drive_msg.estop = bool(telemetry.estop_active) if telemetry is not None else bool(
+            command_state.get("estop", False)
+        )
+        drive_msg.reverse_requested = float(command_state.get("speed_mps", 0.0)) < 0.0
+        drive_msg.speed_valid = telemetry is not None and telemetry.speed_mps is not None
+        drive_msg.steer_valid = telemetry is not None and telemetry.steer_deg is not None
+        drive_msg.control_source = (
+            telemetry.control_source.name if telemetry is not None else "NONE"
+        )
+        drive_msg.speed_mps_measured = (
+            float(telemetry.speed_mps) if drive_msg.speed_valid else 0.0
+        )
+        drive_msg.steer_deg_measured = (
+            float(telemetry.steer_deg) if drive_msg.steer_valid else 0.0
+        )
+        drive_msg.brake_applied_pct = (
+            int(telemetry.brake_applied_pct) if telemetry is not None else 0
+        )
+        self._drive_telemetry_pub.publish(drive_msg)
 
     def destroy_node(self) -> bool:
         self._client.stop()
