@@ -204,8 +204,12 @@ class SimGazeboBackend:
         with self._state_lock:
             self._state.safe_reset()
             self._running = False
-        self._pub.publish(Twist())
-        self._pub.publish(Twist())
+        try:
+            self._pub.publish(Twist())
+            self._pub.publish(Twist())
+        except Exception:
+            # Shutdown may invalidate the publisher context before the node teardown runs.
+            pass
 
     def apply_command(self, cmd: DesiredCommand) -> None:
         with self._state_lock:

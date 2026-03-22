@@ -269,7 +269,8 @@ class ControllerServerNode(Node):
         self._drive_telemetry_pub.publish(drive_msg)
 
     def destroy_node(self) -> bool:
-        self._client.stop()
+        if rclpy.ok():
+            self._client.stop()
         return super().destroy_node()
 
 
@@ -282,4 +283,5 @@ def main(args=None) -> None:
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
