@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import threading
 import time
 from dataclasses import asdict
 
@@ -16,12 +15,7 @@ from .control_logic import (
     safe_command,
     select_effective_command,
 )
-
-
-def _load_comms_client_class():
-    from controller_server.rpy_esp32_comms.transport import CommsClient
-
-    return CommsClient
+from .transport_backends import create_transport_backend
 
 
 class ControllerServerNode(Node):
@@ -44,6 +38,16 @@ class ControllerServerNode(Node):
         self.declare_parameter("auto_drive_enabled", True)
         self.declare_parameter("estop_brake_pct", 100)
         self.declare_parameter("telemetry_stale_timeout_s", 0.5)
+        self.declare_parameter("transport_backend", "uart")
+        self.declare_parameter("sim_cmd_vel_topic", "/cmd_vel_gazebo")
+        self.declare_parameter("sim_odom_topic", "/odom_raw")
+        self.declare_parameter("sim_joint_states_topic", "/joint_states")
+        self.declare_parameter("sim_front_left_steer_joint", "front_left_steer_joint")
+        self.declare_parameter("sim_front_right_steer_joint", "front_right_steer_joint")
+        self.declare_parameter("sim_max_steering_angle_rad", 0.5235987756)
+        self.declare_parameter("sim_telemetry_timeout_s", 0.5)
+        self.declare_parameter("sim_invert_actuation_steer_sign", True)
+        self.declare_parameter("sim_invert_measured_steer_sign", True)
 
         self._serial_port = self.get_parameter("serial_port").value
         self._serial_baud = int(self.get_parameter("serial_baud").value)
@@ -86,19 +90,52 @@ class ControllerServerNode(Node):
         self._telemetry_stale_timeout_s = max(
             0.05, float(self.get_parameter("telemetry_stale_timeout_s").value)
         )
+        self._transport_backend = str(self.get_parameter("transport_backend").value)
+        self._sim_cmd_vel_topic = str(self.get_parameter("sim_cmd_vel_topic").value)
+        self._sim_odom_topic = str(self.get_parameter("sim_odom_topic").value)
+        self._sim_joint_states_topic = str(
+            self.get_parameter("sim_joint_states_topic").value
+        )
+        self._sim_front_left_steer_joint = str(
+            self.get_parameter("sim_front_left_steer_joint").value
+        )
+        self._sim_front_right_steer_joint = str(
+            self.get_parameter("sim_front_right_steer_joint").value
+        )
+        self._sim_max_steering_angle_rad = abs(
+            float(self.get_parameter("sim_max_steering_angle_rad").value)
+        )
+        self._sim_telemetry_timeout_s = max(
+            0.05, float(self.get_parameter("sim_telemetry_timeout_s").value)
+        )
+        self._sim_invert_actuation_steer_sign = bool(
+            self.get_parameter("sim_invert_actuation_steer_sign").value
+        )
+        self._sim_invert_measured_steer_sign = bool(
+            self.get_parameter("sim_invert_measured_steer_sign").value
+        )
 
-        self._state_lock = threading.Lock()
         self._auto_cmd = safe_command()
         self._auto_stamp_s = 0.0
         self._last_source = "init"
 
-        CommsClient = _load_comms_client_class()
-        self._client = CommsClient(
-            port=self._serial_port,
-            baud=self._serial_baud,
-            tx_hz=self._serial_tx_hz,
+        self._client = create_transport_backend(
+            node=self,
+            transport_backend=self._transport_backend,
+            serial_port=self._serial_port,
+            serial_baud=self._serial_baud,
+            serial_tx_hz=self._serial_tx_hz,
             max_speed_mps=self._max_speed_mps,
             max_reverse_mps=self._max_reverse_mps,
+            sim_cmd_vel_topic=self._sim_cmd_vel_topic,
+            sim_odom_topic=self._sim_odom_topic,
+            sim_joint_states_topic=self._sim_joint_states_topic,
+            sim_front_left_steer_joint=self._sim_front_left_steer_joint,
+            sim_front_right_steer_joint=self._sim_front_right_steer_joint,
+            sim_max_steering_angle_rad=self._sim_max_steering_angle_rad,
+            sim_telemetry_timeout_s=self._sim_telemetry_timeout_s,
+            sim_invert_actuation_steer_sign=self._sim_invert_actuation_steer_sign,
+            sim_invert_measured_steer_sign=self._sim_invert_measured_steer_sign,
         )
         self._client.start()
 
@@ -114,7 +151,8 @@ class ControllerServerNode(Node):
 
         self.get_logger().info(
             "controller_server ready "
-            f"(serial={self._serial_port}@{self._serial_baud}, source=/cmd_vel_final)"
+            f"(backend={self._transport_backend}, serial={self._serial_port}@{self._serial_baud}, "
+            "source=/cmd_vel_final)"
         )
 
     def _on_cmd_vel_final(self, msg: CmdVelFinal) -> None:
@@ -131,9 +169,8 @@ class ControllerServerNode(Node):
             auto_drive_enabled=self._auto_drive_enabled,
             reverse_brake_pct=self._reverse_brake_pct,
         )
-        with self._state_lock:
-            self._auto_cmd = cmd
-            self._auto_stamp_s = time.monotonic()
+        self._auto_cmd = cmd
+        self._auto_stamp_s = time.monotonic()
         self.get_logger().info(
             "cmd_vel_final rx "
             f"linear_x={msg.twist.linear.x:.3f} angular_z={msg.twist.angular.z:.3f} "
@@ -143,17 +180,12 @@ class ControllerServerNode(Node):
         )
 
     def _apply_to_controller(self, cmd: DesiredCommand) -> None:
-        self._client.set_drive_enabled(bool(cmd.drive_enabled))
-        self._client.set_estop(bool(cmd.estop))
-        self._client.set_speed_mps(float(cmd.speed_mps))
-        self._client.set_steer_pct(int(cmd.steer_pct))
-        self._client.set_brake_pct(int(cmd.brake_pct))
+        self._client.apply_command(cmd)
 
     def _control_tick(self) -> None:
         now = time.monotonic()
-        with self._state_lock:
-            auto_cmd = self._auto_cmd
-            auto_stamp_s = self._auto_stamp_s
+        auto_cmd = self._auto_cmd
+        auto_stamp_s = self._auto_stamp_s
 
         result = select_effective_command(
             now_s=now,
