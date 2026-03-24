@@ -15,6 +15,7 @@ from .control_logic import (
     safe_command,
     select_effective_command,
 )
+from .logging_policy import should_log_command
 from .transport_backends import create_transport_backend
 
 
@@ -118,6 +119,9 @@ class ControllerServerNode(Node):
         self._auto_cmd = safe_command()
         self._auto_stamp_s = 0.0
         self._last_source = "init"
+        self._last_logged_auto_cmd: DesiredCommand | None = None
+        self._last_cmd_log_s: float | None = None
+        self._cmd_log_heartbeat_s = 5.0
 
         self._client = create_transport_backend(
             node=self,
@@ -156,6 +160,7 @@ class ControllerServerNode(Node):
         )
 
     def _on_cmd_vel_final(self, msg: CmdVelFinal) -> None:
+        now_s = time.monotonic()
         cmd = command_from_cmd_vel(
             linear_x=msg.twist.linear.x,
             angular_z=msg.twist.angular.z,
@@ -170,14 +175,25 @@ class ControllerServerNode(Node):
             reverse_brake_pct=self._reverse_brake_pct,
         )
         self._auto_cmd = cmd
-        self._auto_stamp_s = time.monotonic()
-        self.get_logger().info(
-            "cmd_vel_final rx "
-            f"linear_x={msg.twist.linear.x:.3f} angular_z={msg.twist.angular.z:.3f} "
-            f"brake_pct={int(msg.brake_pct)} -> "
-            f"drive={int(cmd.drive_enabled)} estop={int(cmd.estop)} "
-            f"speed_mps={cmd.speed_mps:.3f} steer_pct={cmd.steer_pct} brake_pct={cmd.brake_pct}"
+        self._auto_stamp_s = now_s
+        log_decision = should_log_command(
+            current_cmd=cmd,
+            last_logged_cmd=self._last_logged_auto_cmd,
+            now_s=now_s,
+            last_log_s=self._last_cmd_log_s,
+            heartbeat_s=self._cmd_log_heartbeat_s,
         )
+        if log_decision.should_log:
+            self._last_logged_auto_cmd = cmd
+            self._last_cmd_log_s = now_s
+            self.get_logger().info(
+                "cmd_vel_final rx "
+                f"[{log_decision.reason}] "
+                f"linear_x={msg.twist.linear.x:.3f} angular_z={msg.twist.angular.z:.3f} "
+                f"brake_pct={int(msg.brake_pct)} -> "
+                f"drive={int(cmd.drive_enabled)} estop={int(cmd.estop)} "
+                f"speed_mps={cmd.speed_mps:.3f} steer_pct={cmd.steer_pct} brake_pct={cmd.brake_pct}"
+            )
 
     def _apply_to_controller(self, cmd: DesiredCommand) -> None:
         self._client.apply_command(cmd)
