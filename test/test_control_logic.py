@@ -156,6 +156,24 @@ def test_command_from_cmd_vel_invert_steer() -> None:
     assert cmd.steer_pct == -50
 
 
+def test_command_from_cmd_vel_invert_steer_not_applied_in_reverse() -> None:
+    cmd = command_from_cmd_vel(
+        linear_x=-0.60,
+        angular_z=0.4,
+        brake_pct=0,
+        max_speed_mps=4.0,
+        max_reverse_mps=1.3,
+        vx_deadband_mps=0.10,
+        vx_min_effective_mps=0.75,
+        max_abs_angular_z=0.8,
+        invert_steer=True,
+        auto_drive_enabled=True,
+        reverse_brake_pct=25,
+    )
+    assert cmd.speed_mps == -0.60
+    assert cmd.steer_pct == 50
+
+
 def test_command_from_cmd_vel_below_deadband_maps_to_zero() -> None:
     cmd = command_from_cmd_vel(
         linear_x=0.05,

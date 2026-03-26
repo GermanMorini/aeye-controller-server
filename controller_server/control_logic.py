@@ -74,7 +74,8 @@ def command_from_cmd_vel(
     angular_scale = max(0.01, abs(float(max_abs_angular_z)))
     steer_ratio = clamp(steer_angular / angular_scale, -1.0, 1.0)
     steer = int(round(steer_ratio * 100.0))
-    if bool(invert_steer):
+    # Invert steering sign only when not commanding reverse motion.
+    if bool(invert_steer) and speed >= 0.0:
         steer = -steer
 
     brake = int(clamp(float(brake_pct), 0.0, 100.0))
