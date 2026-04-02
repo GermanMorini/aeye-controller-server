@@ -42,6 +42,11 @@ Paquete ROS 2 para el puente entre el backend de navegación y el protocolo UART
 ros2 launch controller_server controller_server.launch.py
 ```
 
+Simulación Gazebo:
+```bash
+ros2 launch controller_server controller_server_sim.launch.py
+```
+
 Con helpers del workspace:
 ```bash
 ./tools/launch_controller.sh
